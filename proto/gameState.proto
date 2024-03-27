@@ -1,0 +1,35 @@
+/*
+* to compile: /d/DDownloads/protoc-26.0-win64/bin/protoc.exe --go_out=. --proto_path=. gameState.proto
+*/
+syntax = "proto3";
+
+package idleCoder;
+
+option go_package = ".";
+
+
+message File {
+    string name = 1;
+    string contents = 2;
+    string permissions = 3;
+    string owner = 4;
+    int32 size = 5;
+    int64 modifyDate = 6;
+}
+
+message Directory {
+    string name = 1;
+    repeated File files = 2;
+    string permissions = 3;
+    string owner = 4;
+    repeated Directory dirs = 5;
+    int64 modifyDate = 6;
+}
+
+message GameState {
+    int64 lastSave = 1;
+    int64 money = 2;
+    string username = 3;
+    string currentDir = 4;
+    Directory dirs = 5;
+}

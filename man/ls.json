@@ -1,0 +1,14 @@
+{
+    "name": "ls - list directory contents",
+    "synopsis": "ls [OPTION]... [FILE]...",
+    "description": "List information about the FILEs (the current directory by default). Sort entries alphabetically.",
+    "options": [
+        ["-a, --all", "do not ignore entries starting with ."],
+        ["-l", "use a long listing format\n(lists permissions, owner, group, size, and time)"],
+        ["-h", "--human-readable", "with -l, print human readable sizes\n(e.g., 1K, 234M, 2G)"]
+    ],
+    "examples": [
+        ["List all files in the current directory:", "ls"],
+        ["List files in a long format with human-readable sizes:", "ls -lh"]
+    ]
+}

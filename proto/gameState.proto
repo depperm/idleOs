@@ -26,10 +26,20 @@ message Directory {
     int64 modifyDate = 6;
 }
 
-message GameState {
+message Process {
+    string name = 1;
+    string amount = 2;
+    double linesPerHour = 3;
+    double cost = 4;
+    repeated string tech = 5;
+}
+
+message PlayerInfo {
     int64 lastSave = 1;
-    int64 money = 2;
+    double lines = 2;
     string username = 3;
-    string currentDir = 4;
-    Directory dirs = 5;
+    File earnedAchievements = 4;
+    repeated string history = 5;
+    repeated Process processes = 6;
+    Directory dirs = 7;
 }

@@ -1,9 +1,8 @@
-package idleOs
+package main
 
 import (
 	"bufio"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -14,19 +13,18 @@ import (
 	"time"
 
 	//  . "filesamedir"
-
+	"github.com/depperm/idleOs/basicCmd"
 	pb "github.com/depperm/idleOs/proto"
 	"github.com/inancgumus/screen"
 	"google.golang.org/protobuf/proto"
 )
 
-type Man struct {
-	Name        string     `json:"name"`
-	Synopsis    string     `json:"synopsis"`
-	Description string     `json:"description"`
-	Options     [][]string `json:"options"`
-	Examples    [][]string `json:"examples"`
+type GameState struct {
+	CurrentDir   string
+	Achievements string
+	Player       pb.PlayerInfo
 }
+
 type FileDir struct {
 	Name        string
 	Permissions string
@@ -59,11 +57,14 @@ func formatBytes(size int32) string {
 	return fmt.Sprintf("%4.1f%s", roundedSize, units[unitIndex])
 }
 
-func handleInput(input string, gameState *pb.GameState) {
+func handleInput(input string, gameState *GameState) {
 	tokens := strings.Split(strings.TrimSpace(input), " ")
 	cmd := tokens[0]
 	options := make(map[string]int)
 	var positional []string
+	if len(strings.TrimSpace(input)) > 0 {
+		gameState.Player.History = append(gameState.Player.History, input)
+	}
 	if len(tokens) > 1 {
 		// get options
 		for j := 1; j < len(tokens); j++ {
@@ -85,44 +86,28 @@ func handleInput(input string, gameState *pb.GameState) {
 			}
 		}
 	}
-	fmt.Println(tokens)
+	// fmt.Println(tokens)
 	switch cmd {
 	case "":
 		fmt.Print("")
 	case "man":
-		basicCmd.manCmd(tokens[1])
-		if len(tokens) == 2 {
-			file, err := os.Open(strings.Join([]string{"man/", tokens[1], ".json"}, ""))
-			if err != nil {
-				// no man page for given command
-				fmt.Printf("bash: %s: command not found", tokens[0])
-				return
-			}
-			defer file.Close()
-			data, err := io.ReadAll(file)
-			if err != nil {
-				// Handle error
-				os.Exit(5)
-			}
-			var manPage Man
-			if err := json.Unmarshal(data, &manPage); err != nil {
-				os.Exit(6)
-			}
-			// fmt.Printf("got: %+v\n", manPage)
-			// fmt.Println(manPage.Description)
-			// fmt.Printf("%s", data)
-			// w, _ := screen.Size()
-			// fmt.Println(w)
-		}
+		basicCmd.HandleCmd(tokens)
 	case "help":
-		fmt.Println("should print something")
+		fmt.Println("TODO should print something")
 	case "whoami":
-		fmt.Println(gameState.Username)
+		fmt.Println(gameState.Player.Username)
+	case "history":
+		for _, cmd := range gameState.Player.History {
+			fmt.Println(cmd)
+		}
+	case "clear":
+		screen.Clear()
+		screen.MoveTopLeft()
 	case "cd":
 		fmt.Print("")
 		if len(tokens) == 1 {
 			// change to root dir
-			gameState.CurrentDir = gameState.Dirs.Name
+			gameState.CurrentDir = gameState.Player.Dirs.Name
 		} else {
 			dst := strings.Split(strings.TrimRight(tokens[1], "/"), "/")
 			fmt.Print(dst)
@@ -135,14 +120,14 @@ func handleInput(input string, gameState *pb.GameState) {
 		_, long := options["l"]
 		_, human := options["h"]
 		if len(tokens) == 1 {
-			contents := getContentNames(gameState.Dirs, false)
+			contents := getContentNames(gameState.Player.Dirs, false)
 			sort.Strings(contents)
 			fmt.Println(strings.Join(contents, "  "))
 		} else {
 			// TODO  details
 			if long {
 				// fmt.Println(strings.Join(getContentNames(gameState.Dirs, hiddenFlag || hiddenBig), "\n"))
-				contents := getContents(gameState.Dirs, hiddenFlag || hiddenBig)
+				contents := getContents(gameState.Player.Dirs, hiddenFlag || hiddenBig)
 				sort.Sort(ByName(contents))
 				for _, fileDir := range contents {
 					d := "-"
@@ -163,7 +148,7 @@ func handleInput(input string, gameState *pb.GameState) {
 					fmt.Printf("%s%s %s %s %s MON DY HH:MM %s\n", d, fileDir.Permissions, fileDir.Owner, fileDir.Owner, s, fileDir.Name)
 				}
 			} else {
-				contents := getContentNames(gameState.Dirs, hiddenFlag || hiddenBig)
+				contents := getContentNames(gameState.Player.Dirs, hiddenFlag || hiddenBig)
 				sort.Strings(contents)
 				fmt.Println(strings.Join(contents, " "))
 			}
@@ -226,7 +211,7 @@ func getContentNames(dir *pb.Directory, hidden bool) []string {
 	return s
 }
 
-func GameLoop(gameState *pb.GameState) {
+func GameLoop(gameState *GameState) {
 	var userInput string
 	screen.Clear()
 	// TODO
@@ -237,7 +222,7 @@ func GameLoop(gameState *pb.GameState) {
 	screen.MoveTopLeft()
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		fmt.Printf("[%s@IDLE %s]$ ", gameState.Username, gameState.CurrentDir)
+		fmt.Printf("[%s@IDLE %s]$ ", gameState.Player.Username, gameState.CurrentDir)
 		scanner.Scan()
 		userInput = scanner.Text()
 		if userInput == "exit" || userInput == "quit" || userInput == "logout" {
@@ -263,7 +248,7 @@ func Write(w io.Writer, msg []byte) error {
 	return nil
 }
 
-func SaveProto(myProto *pb.GameState) error {
+func SaveProto(myProto *pb.PlayerInfo) error {
 	msgBytes, err := proto.Marshal(myProto)
 	if err != nil {
 		return err
@@ -282,46 +267,50 @@ func SaveProto(myProto *pb.GameState) error {
 	return nil
 }
 
-func AutoSave(gameState *pb.GameState) {
+func AutoSave(playerInfo *pb.PlayerInfo) {
 	var mu sync.Mutex
 	for range time.Tick(10 * time.Second) {
 		// fmt.Printf("should save: %+v\n", gameState)
 		mu.Lock()
-		gameCopy := gameState
+		playerCopy := playerInfo
 		mu.Unlock()
-		gameCopy.LastSave = time.Now().UnixMilli()
+		playerCopy.LastSave = time.Now().UnixMilli()
 
-		err := SaveProto(gameCopy)
+		err := SaveProto(playerCopy)
 		if err != nil {
 			os.Exit(2)
 		}
 	}
 }
 
-func LoadGame() (*pb.GameState, error) {
+func LoadGame() (*GameState, error) {
 	// Open the encoded file for reading
 	file, err := os.Open("data.isf")
 	if err != nil {
 		// File does not exist, new game
-		var gameState pb.GameState
-		gameState.Username = "root"
-		gameState.Money = 0
-		gameState.CurrentDir = "/"
-		gameState.Dirs = &pb.Directory{
+		var playerInfo pb.PlayerInfo
+		playerInfo.Username = "root"
+		playerInfo.Lines = 0
+		// gameState.CurrentDir = "/"
+		playerInfo.Dirs = &pb.Directory{
 			Name:        "/",
 			Files:       []*pb.File{},
-			Permissions: "rwxrwxrwx",
+			Permissions: "rw-rw-rw-",
 			Owner:       "root",
 			ModifyDate:  time.Now().UnixMilli(),
 			Dirs: []*pb.Directory{
-				{Name: "team", Owner: "root", Permissions: "rwxrwxrwx", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
-				{Name: "languages", Owner: "root", Permissions: "rwxrwxrwx", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
-				{Name: "tech", Owner: "root", Permissions: "rwxrwxrwx", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
-				{Name: "shop", Owner: "root", Permissions: "rwxrwxrwx", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
-				{Name: "usr", Owner: "root", Permissions: "rwxrwxrwx", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
-				{Name: ".achievement", Owner: "root", Permissions: "rwxrwxrwx", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
+				{Name: "team", Owner: "root", Permissions: "rw-rw-rw-", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
+				{Name: "languages", Owner: "root", Permissions: "rw-rw-rw-", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
+				{Name: "tech", Owner: "root", Permissions: "rw-rw-rw-", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
+				{Name: "shop", Owner: "root", Permissions: "rw-rw-rw-", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
+				{Name: "usr", Owner: "root", Permissions: "rw-rw-rw-", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
+				{Name: ".achievement", Owner: "root", Permissions: "rw-rw-rw-", ModifyDate: time.Now().UnixMilli(), Files: []*pb.File{}, Dirs: []*pb.Directory{}},
 			},
 		}
+		gameState := GameState{}
+		gameState.CurrentDir = "/"
+		gameState.Player = playerInfo
+		//gameState.achievements
 		return &gameState, nil
 	}
 	defer file.Close()
@@ -348,8 +337,8 @@ func LoadGame() (*pb.GameState, error) {
 	// fmt.Println("Decoded string:", str)
 
 	// Convert the decoded string to a Protocol Buffers message
-	gameState := &pb.GameState{}
-	err = proto.Unmarshal([]byte(str), gameState)
+	gameState := &GameState{}
+	err = proto.Unmarshal([]byte(str), &gameState.Player)
 	if err != nil {
 		// Handle error
 		return nil, err
@@ -364,6 +353,6 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-	go AutoSave(gameState)
+	go AutoSave(&gameState.Player)
 	GameLoop(gameState)
 }

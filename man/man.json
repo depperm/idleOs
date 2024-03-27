@@ -1,0 +1,9 @@
+{
+    "name": "man - an interface to the system reference manuals",
+    "synopsis": "man [page]",
+    "description": "man is the system's manual pager. The manual page associated with each of these arguments is then found and displayed.",
+    "options": [],
+    "examples": [
+        ["Display the manual page for the program ls", "man ls"]
+    ]
+}

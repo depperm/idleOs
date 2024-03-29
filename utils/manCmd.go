@@ -1,4 +1,4 @@
-package basicCmd
+package utils
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ type Man struct {
 	Examples    [][]string `json:"examples"`
 }
 
-func HandleCmd(tokens []string) {
+func ManCmd(tokens []string) {
 	screen.Clear()
 	screen.MoveTopLeft()
 	manualPage := "man"

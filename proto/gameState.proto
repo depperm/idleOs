@@ -34,6 +34,11 @@ message Process {
     repeated string tech = 5;
 }
 
+message Upgrade {
+    string name = 1;
+    float64 level = 2;
+}
+
 message PlayerInfo {
     int64 lastSave = 1;
     double lines = 2;
@@ -42,4 +47,9 @@ message PlayerInfo {
     repeated string history = 5;
     repeated Process processes = 6;
     Directory dirs = 7;
+    int32 wpm = 8;
+    int32 processingPower = 9;
+    repeated Upgrade tech = 10;
+    repeated Upgrade lang = 11;
+    repeated Upgrade research = 12;
 }

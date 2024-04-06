@@ -5,6 +5,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	pb "github.com/depperm/idleOs/proto"
 )
@@ -22,6 +23,16 @@ type ByName []FileDir
 func (a ByName) Len() int           { return len(a) }
 func (a ByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
+func HasExe(gameState *GameState, exe string) bool {
+	contents := getContentNames(gameState.Player.Dirs, false)
+	for _, file := range contents {
+		if file == fmt.Sprintf("%s.exe", exe) {
+			return true
+		}
+	}
+	return false
+}
 
 func LsCmd(gameState *GameState, tokens []string, options map[string]int) {
 	_, hiddenFlag := options["a"]
@@ -54,7 +65,28 @@ func LsCmd(gameState *GameState, tokens []string, options map[string]int) {
 				// } else {
 				// 	fmt.Printf("-%s %s %s", fileDir.Permissions, fileDir.Owner, fileDir.Owner)
 				// }
-				fmt.Printf("%s%s %s %s %s MON DY HH:MM %s\n", d, fileDir.Permissions, fileDir.Owner, fileDir.Owner, s, fileDir.Name)
+				currentTime := time.Unix(0, fileDir.ModifyDate*int64(time.Millisecond))
+				if currentTime.Year() != time.Unix(0, time.Now().UnixMilli()*int64(time.Millisecond)).Year() {
+					fmt.Printf("%s%s %s %s %s %s %02d HH:MM %s\n",
+						d,
+						fileDir.Permissions,
+						fileDir.Owner,
+						fileDir.Owner,
+						s,
+						currentTime.Month().String()[:3],
+						currentTime.Day(),
+						fileDir.Name)
+				} else {
+					fmt.Printf("%s%s %s %s %s %s %02d HH:MM %s\n",
+						d,
+						fileDir.Permissions,
+						fileDir.Owner,
+						fileDir.Owner,
+						s,
+						currentTime.Month().String()[:3],
+						currentTime.Day(),
+						fileDir.Name)
+				}
 			}
 		} else {
 			contents := getContentNames(gameState.Player.Dirs, hiddenFlag || hiddenBig)

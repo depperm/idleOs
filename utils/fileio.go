@@ -72,6 +72,7 @@ func LoadGame() (*GameState, error) {
 		var playerInfo pb.PlayerInfo
 		playerInfo.Username = "root"
 		playerInfo.Lines = 0
+		playerInfo.Wpm = 40
 		// gameState.CurrentDir = "/"
 		playerInfo.Dirs = &pb.Directory{
 			Name: "/",
